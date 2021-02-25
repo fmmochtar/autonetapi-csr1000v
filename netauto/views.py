@@ -8,6 +8,11 @@ import urllib3
 import json
 from datetime import datetime
 from .decorators import superadmin_only
+import csrestapi.auth
+import csrestapi.api
+
+router = csrestapi
+
 
 FILE_TYPE = ['txt', 'conf']
 
@@ -44,6 +49,19 @@ def devices(request):
         'superadmin' : check_superadmin(request),
     }
     return render(request, 'netauto/devices.html', context)
+
+@login_required
+def show_interfaces(request):
+    selected_devices = request.POST.getlist('device')
+    for x in selected_devices:
+        dev = get_object_or_404(Device, pk=x)
+    
+        token = router.api.device(dev.ip_address, dev.username, dev.password).token()
+        get_interfaces = router.api.interface(dev.ip_address, token).get_all()
+
+        interfaces = json.loads(get_interfaces['items'][x]['if-name'])
+        print(interfaces)
+
 
 @login_required
 @superadmin_only
