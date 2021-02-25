@@ -1,5 +1,7 @@
 # AutoNetAPI 
 
+This is a fork of the original [AutoNetAPI](https://github.com/abdarafi/autonetapi-csr1000v) developed by [abdarafi](https://github.com/abdarafi).
+
 Automate the Cisco CSR1000V Router using REST API with Django Framework
 
 ![](./screenshot.png)
