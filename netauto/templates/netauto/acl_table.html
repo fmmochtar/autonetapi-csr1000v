@@ -1,0 +1,27 @@
+{% extends 'netauto/base.html' %} {% block content %}
+<!-- Content Row -->
+
+<!-- Total Devices -->
+
+<!-- Content Row -->
+
+<h1 class="h3 mb-0 text-gray-800">Lists of available Access Control List</h1>
+<br />
+<div class="table-responsive">
+  <table class="table table-light text-gray-800 table-bordered table-hover">
+    <thead>
+      <tr>
+        <th scope="col">ID</th>
+        <!---<th scope="col">Rules</th> --->
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in acl_list %}
+      <tr>
+        <td>{{ log.acl_id }}</td>
+        {% endfor %}
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endblock content %}
