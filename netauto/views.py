@@ -83,12 +83,6 @@ def show_interfaces(request):
     selected_devices = request.POST.getlist('device')
     for x in selected_devices:
         dev = get_object_or_404(Device, pk=x)
-    
-        token = api.device(dev.ip_address, dev.username, dev.password).token()
-        get_interfaces = api.interface(dev.ip_address, token).get_all()
-
-        interfaces = json.loads(get_interfaces['items'][x]['if-name'])
-        print(interfaces)
     if request.method == "POST":
         head = 'List of available interfaces'
         #cisco_command = request.POST['cisco_command']
@@ -104,9 +98,9 @@ def show_interfaces(request):
                 json_data = json.loads(get_interfaces)
                 #print(json.dumps(json_data, indent=4, separators=(',', ': ')))
                 if get_interfaces.status_code >= 400:
-                    return (json_data['detail'], 'gabisa')
+                    return ('gabisa', json_data['detail'],)
                 else:
-                    return (json_data['results'], 'bisa')
+                    return ('bisa', json_data['results'])
 
             # Disable unverified HTTPS request warnings.
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -116,7 +110,7 @@ def show_interfaces(request):
 
             # Put the CLI Command
             get_int_data(token)
-            if get_int_data(token)[1] == "bisa":
+            if get_int_data(token)[0] == "bisa":
                 log = Log(target=dev.ip_address, action="Get interfaces list", status="Successful", time= datetime.now(), user=request.user.username, messages="No Error")
                 log.save()
             else:
@@ -127,30 +121,25 @@ def show_interfaces(request):
             log.save()
         context = {
             'head' : head,
-            'status' : get_int_data(token),
+            'status' : get_int_data(token)[1],
         }
         return render(request, 'netauto/result.html', context)
     else:
-        head = 'Validate your configuration'
+        head = 'List of available interfaces'
         all_devices = Device.objects.all()
         context = {
             'all_devices' : all_devices,
             'head' : head,
             'superadmin' : check_superadmin(request),
         }
-        return render(request, 'netauto/validate.html', context)
+        return render(request, 'netauto/device_select_interface.html', context)
 
 @login_required
 def show_acl(request):
     selected_devices = request.POST.getlist('device')
     for x in selected_devices:
         dev = get_object_or_404(Device, pk=x)
-    
         token = api.device(dev.ip_address, dev.username, dev.password).token()
-        get_interfaces = api.interface(dev.ip_address, token).get_all()
-
-        interfaces = json.loads(get_interfaces['items'][x]['if-name'])
-        print(interfaces)
     if request.method == "POST":
         head = 'List of registered ACL'
         #cisco_command = request.POST['cisco_command']
