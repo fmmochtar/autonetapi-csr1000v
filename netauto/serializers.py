@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
-from .models import Device
+from .models import Device, AttackLog
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
@@ -16,6 +16,11 @@ class DeviceSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Device
         fields = ['ip_address', 'hostname']
+
+class AttackLogSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = AttackLog
+        fields = ['source_ip', 'dst_port']
 
 # class AttackLogSerializer(serializers.HyperlinkedModelSerializer):
 #     class Meta:

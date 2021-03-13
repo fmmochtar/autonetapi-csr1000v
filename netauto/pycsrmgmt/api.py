@@ -22,11 +22,11 @@ class device(object):
                 token_data = json.loads(get_token.text)['token-id']
                 return token_data
         except get_token.status_code != 200:
-            if get_token.status_code == 401 | get_token.status_code == 403:
-                message = "Error authenticating with device."
+            if get_token.status_code == 401:
+                message = "401-error"
                 return message
             elif get_token.status_code != 200:
-                message = "Error initiating connection with device."
+                message = "connection-error"
                 return message
 
 
@@ -37,6 +37,7 @@ class acl(device):
         self.router_token = router_token
         # self.router_port = router_port
 
+    # Get ACL data by id
     def get(self, acl_id):
         api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id 
         api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token}
@@ -45,6 +46,7 @@ class acl(device):
         output_acl_get = acl_get.text
         return output_acl_get
 
+    # Get all ACL data
     def get_all(self):
         api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl" 
         api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token}
@@ -53,25 +55,138 @@ class acl(device):
         output_acl_get_all = acl_get.text
         return output_acl_get_all
 
+    # Get interfaces associated with ACL ID
+    def get_interfaces(self, acl_id):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id + "/interfaces" 
+        api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        #acl_get = print(api_url, api_headers)
+        acl_get = requests.get(url=api_url, headers=api_headers, verify=False)
+        output_acl_get_all = acl_get.text
+        return output_acl_get_all
+
+    # Apply an ACL into an interface
+    def apply_acl_interface(self, acl_id, acl_interface, acl_direction='inside'):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id + "/interfaces" 
+        api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        #acl_get = print(api_url, api_headers)
+        payload = {
+            "if-id": acl_interface,
+            "direction": acl_direction
+        }
+        acl_apply = requests.post(url=api_url, headers=api_headers, json=payload, verify=False)
+        output_acl_apply = acl_apply.text
+        if acl_apply.status_code == 201:
+            message = 'success'
+            return message
+        elif acl_apply.status_code !=201:
+            return output_acl_apply
+
+    # Remove an ACL associated with an interface 
+    def delete_acl_interface(self, acl_id, acl_interface, acl_direction='inside'):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id + "/s/" + acl_interface + "_" + acl_direction 
+        api_headers = { 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        #acl_get = print(api_url, api_headers)
+        acl_apply = requests.delete(url=api_url, headers=api_headers, verify=False)
+        output_acl_apply = acl_apply.text
+        if acl_apply.status_code == 204:
+            message = 'success'
+            return message
+        elif acl_apply.status_code != 204:
+            return output_acl_apply
+
+    # Get ACL statistics by ID/name
+    def get_statistic(self, acl_id):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/statistics/" + acl_id 
+        api_headers = { 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        #acl_get = print(api_url, api_headers)
+        acl_get = requests.get(url=api_url, headers=api_headers, verify=False)
+        output_acl_get_stat = acl_get.text
+        return output_acl_get_stat
+
+    # Get all ACL statistics
+    def get_statistic_all(self):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/statistics" 
+        api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        #acl_get = print(api_url, api_headers)
+        acl_get = requests.get(url=api_url, headers=api_headers, verify=False)
+        output_acl_get_stat_all = acl_get.text
+        return output_acl_get_stat_all
+
+    # Configure a new ACL with a rule
     def configure(self, acl_sequence, acl_protocol, acl_src_ip, acl_dst_ip, acl_action, srcport='', srcop='eq', srcport_end='', dstport='eq', dstop='',  dstport_end=''):
         api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl"
         api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        new_rule = {
+                        "sequence" : acl_sequence,
+                        "protocol": acl_protocol,
+                        "source": acl_src_ip,
+                        "destination": acl_dst_ip,
+                        "action": acl_action,
+        }
+
+        srcport_options = {
+            "src-port-start" : srcport,
+            "src-port-op" : srcop,
+        }
+
+        srcport_end_options = {
+            "src-port-end" : srcport_end,
+        }
+
+        dstport_options = {
+            "dest-port-start" : dstport,
+            "dest-port-op" : dstop
+        }
+
+        dstport_end_options = {
+            "dest-port-end" : dstport_end,
+        }
+
+        option_payload = {}
+        
+        port_payload = { "l4-options" : option_payload }
+
+        if acl_protocol == "tcp" | acl_protocol == "udp":
+            if len(srcport) >= 1:
+                if srcop == "eq" | srcop == "gt" | srcop == "lt":
+                    option_payload.update(srcport_options)
+                    new_rule.update(port_payload)
+                elif srcop == "range":
+                    if len(srcport_end) < 1:
+                        srcop = "eq"
+                        option_payload.update(srcport_options)
+                        new_rule.update(port_payload)
+                    elif len(srcport_end) >= 1:
+                        option_payload.update(srcport_options)
+                        option_payload.update(srcport_end_options)
+                        new_rule.update(port_payload)
+
+            elif len(srcport) < 1:
+                pass
+
+            if len(dstport) >= 1:
+                if dstop == "eq" | dstop == "gt" | dstop == "lt":
+                    option_payload.update(dstport_options)
+                    new_rule.update(port_payload)
+                elif dstop == "range":
+                    if len(dstport_end) < 1 :
+                        dstop = "eq"
+                        option_payload.update(dstport_options)
+                        new_rule.update(port_payload)
+                    elif len(dstport_end) >= 1 :
+                        option_payload.update(dstport_options)
+                        option_payload.update(dstport_end_options)
+                        new_rule.update(port_payload)
+            elif len(dstport) < 1 :
+                pass
+
+        else:
+            pass
+
         payload = {
             "kind": "object#acl",
             "rules": [
-                {
-                    "sequence" : acl_sequence,
-                    "protocol": acl_protocol,
-                    "source": acl_src_ip,
-                    "destination": acl_dst_ip,
-                    "action": acl_action,
-                    # "l4-options" : {
-                    #     "src-port-start" : "ftp",
-                    #     "src-port-op" : "eq",
-                    #     "dest-port-start" : "ftp",
-                    #     "dest-port-op": "eq"
-                    # }
-                }
+                new_rule
                 ]
             }
         acl_config = requests.post(url=api_url, headers=api_headers, json=payload, verify=False)
@@ -82,7 +197,8 @@ class acl(device):
             message = 'error'
             return message
 
-# work in progress, needs to add append function
+    # work in progress, needs to add append function
+    # Add a rule into an existing ACL 
     def add_existing(self, acl_id, acl_sequence, acl_protocol, acl_src_ip, acl_dst_ip, acl_action, srcport='', srcop='eq', srcport_end='', dstport='', dstop='eq',  dstport_end=''):
         api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id
         api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
@@ -119,35 +235,43 @@ class acl(device):
         
         port_payload = { "l4-options" : option_payload }
 
-        if len(srcport) >= 1:
-            if srcop == "eq":
-                if len(srcport_end) < 1:
+        if acl_protocol == "tcp" | acl_protocol == "udp":
+            if len(srcport) >= 1:
+                if srcop == "eq" | srcop == "gt" | srcop == "lt":
                     option_payload.update(srcport_options)
                     new_rule.update(port_payload)
-                elif len(srcport_end) >= 1:
-                    option_payload.update(srcport_options)
-                    option_payload.update(srcport_end_options)
-                    new_rule.update(port_payload)
-        elif len(srcport) < 1:
-            pass
-            
-        if len(dstport) >= 1:
-            if dstop == "eq":
-                if len(dstport_end) < 1 :
-                    option_payload.update(dstport_options)
-                    new_rule.update(port_payload)
-                elif len(dstport_end) >= 1 :
-                    option_payload.update(dstport_options)
-                    option_payload.update(dstport_end_options)
-                    new_rule.update(port_payload)
-        elif len(dstport) < 1 :
-            pass
+                elif srcop == "range":
+                    if len(srcport_end) < 1:
+                        srcop = "eq"
+                        option_payload.update(srcport_options)
+                        new_rule.update(port_payload)
+                    elif len(srcport_end) >= 1:
+                        option_payload.update(srcport_options)
+                        option_payload.update(srcport_end_options)
+                        new_rule.update(port_payload)
 
-        # if len(srcport) | len(srcport) + len(srcport_end) > 1:
-        #     new_rule.update(port_options)
-        
-        # Add new rule into the payload
-        existing_rules.append(new_rule)
+            elif len(srcport) < 1:
+                pass
+
+            if len(dstport) >= 1:
+                if dstop == "eq" | dstop == "gt" | dstop == "lt":
+                    option_payload.update(dstport_options)
+                    new_rule.update(port_payload)
+                elif dstop == "range":
+                    if len(dstport_end) < 1 :
+                        dstop = "eq"
+                        option_payload.update(dstport_options)
+                        new_rule.update(port_payload)
+                    elif len(dstport_end) >= 1 :
+                        option_payload.update(dstport_options)
+                        option_payload.update(dstport_end_options)
+                        new_rule.update(port_payload)
+            elif len(dstport) < 1 :
+                pass
+
+            existing_rules.append(new_rule)
+        else:
+            pass
 
         payload = {
             "kind": "object#acl",
@@ -162,11 +286,12 @@ class acl(device):
         output_acl_config = acl_config.text
         return output_acl_config
 
+    # Remove existing rule from an ACL
     def remove_existing(self, acl_id, acl_sequence):
         api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id
         api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
         acl_get = requests.get(url=api_url, headers=api_headers, verify=False)
-        full_response = json.loads(acl_get.text)
+        # full_response = json.loads(acl_get.text)
         existing_rules = json.loads(acl_get.text)['rules']
 
         new_rule = [x for x in existing_rules if not (int(acl_sequence) == x.get('sequence'))]  
@@ -184,37 +309,52 @@ class acl(device):
         #print ('here is your payload')
         #print (x)
         #print(x)
-        print(payload)
+        #print(payload)
+
+        acl_config = requests.put(url=api_url, headers=api_headers, json=payload, verify=False)
+        output_acl_config = acl_config.text
+        return output_acl_config
+
+    # Remove existing rule related with source IP from an ACL associated with ID
+    def remove_existing_srcip(self, acl_id, acl_src_ip):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id
+        api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        acl_get = requests.get(url=api_url, headers=api_headers, verify=False)
+        # full_response = json.loads(acl_get.text)
+        existing_rules = json.loads(acl_get.text)['rules']
+
+        new_rule = [x for x in existing_rules if not (acl_src_ip == x.get('source'))]  
+        # print(new_rule)
+        # print(len(new_rule))
+        # print(len(existing_rules))
+
+        payload = {
+            "kind": "object#acl",
+            "rules": new_rule
+            }
 
         acl_config = requests.put(url=api_url, headers=api_headers, json=payload, verify=False)
         output_acl_config = acl_config.text
         return output_acl_config
    
-    def modify(self, acl_id, acl_sequence, acl_protocol, acl_src_ip, acl_dst_ip, acl_action):
-        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id
-        api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
-        payload = {
-            "kind": "object#acl",
-            "rules": [
-                {
-                    "sequence" : acl_sequence,
-                    "protocol": acl_protocol,
-                    "source": acl_src_ip,
-                    "destination": acl_dst_ip,
-                    "action": acl_action,
-                }
-                ]
-            }
-        acl_config = requests.put(url=api_url, headers=api_headers, json=payload, verify=False)
-        output_acl_config = acl_config.text
-        return output_acl_config
-
+   # Delete an ACL
     def delete(self, acl_id):
         api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id 
         api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token}
         acl_del = requests.delete(url=api_url, headers=api_headers, verify=False)
         output_acl_del = acl_del.text
         return output_acl_del
+
+    # def assign_acl_interface(self, acl_id, acl_interface, acl_direction):
+    #     api_url = "https://" + self.router_ip + ":55443" + "/api/v1/acl/" + acl_id + "/interfaces"
+    #     api_headers = { 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+    #     payload = {
+    #         "if-id": acl_interface,
+    #         "direction": acl)
+    #     }
+    #     acl_assign = requests.post(url=api_url, headers=api_headers, json=payload, verify=False)
+    #     print('x')
+
 
 class interface(device):
     def __init__(self, router_ip, router_token):
@@ -228,8 +368,65 @@ class interface(device):
         output_int_get_all = int_get.text
         return output_int_get_all
 
-    def configure(self, router_interface, interface_ip_address, interface_netmask, *interface_status):
-        print (router_interface, interface_ip_address, interface_status)
+    def create(self, router_interface_type, router_interface, interface_ip_address, interface_netmask, interface_status='true', description='', interface_nat_direction=''):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/interfaces/" + router_interface
+        api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        nat_payload = { "nat-direction": interface_nat_direction }
+        payload = {
+            "type" : router_interface_type,
+            "if-name": router_interface,
+            "description": description,
+            "ip-address": interface_ip_address,
+            "subnet-mask": interface_netmask,
+            "enabled": interface_status
+        }
 
-    def link_status(self, router_interface, interface_status):
-        print (router_interface, interface_status)
+        if interface_nat_direction >= 1:
+            payload.update(nat_payload)
+
+        int_create = requests.put(url=api_url, headers=api_headers, json=payload, verify=False)
+        output = int_create.text
+        if int_create.status_code == 201:
+            message = 'success'
+        else:
+            message = output
+        return message
+
+
+    # configure interface
+    # basic functions only
+    def configure(self, router_interface, interface_ip_address, interface_netmask, interface_status='true', interface_type='ethernet'):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/interfaces/" + router_interface
+        api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        payload = {
+            "type" : interface_type,
+            "if-name": router_interface,
+            "ip-address": interface_ip_address,
+            "subnet-mask": interface_netmask,
+            "enabled": interface_status
+        }
+        int_conf = requests.post(url=api_url, headers=api_headers, json=payload, verify=False)
+        output = int_conf.text
+        if int_conf.status_code == 201:
+            message = 'success'
+        else:
+            message = output
+        return message
+
+    def link_status_change(self, router_interface, interface_status):
+        api_url = "https://" + self.router_ip + ":55443" + "/api/v1/interfaces/" + router_interface + "/state"
+        api_headers={ 'Content-Type': 'application/json', 'X-auth-token': self.router_token }
+        payload = {
+            "if-name": router_interface,
+            "enabled": interface_status
+        }
+        int_set = requests.put(url=api_url, headers=api_headers, json=payload, verify=False)
+        output_int_set = int_set.text
+        if int_set.status_code == 201:
+            message = 'success'
+            return message
+        else:
+            return output_int_set
+
+    # def link_status(self, router_interface, interface_status):
+    #     print (router_interface, interface_status)

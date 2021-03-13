@@ -94,11 +94,11 @@
             <div class="bg-white py-2 collapse-inner rounded">
               <h6 class="collapse-header">Configuration:</h6>
               <a class="collapse-item" href=" {% url 'add_ip' %} ">IP Address</a>
-              <!--- a class="collapse-item" href=" {% url 'acl_config %}">ACL Configuration</a --->
+              <!--- <a class="collapse-item" href="  url 'acl_config' ">ACL Configuration</a>  --->
               <a class="collapse-item" href=" {% url 'custom' %} ">Custom Configuration</a>
               <div class="collapse-divider">
                 <h6 class="collapse-header">Routing:</h6>
-                <a class="collapse-item" href=" {% url 'static' %} ">Static Route</a>
+              <!---   <a class="collapse-item" href=" { url 'static' } ">Static Route</a> -->
               </div>
             </div>
           </div>
@@ -317,8 +317,6 @@ $('.regex-control').keyup(function(){
 });
 
 </script>
-
-
 
     {% for device in all_devices %}
     <script>

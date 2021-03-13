@@ -18,7 +18,7 @@
     <tbody>
       {% for log in acl_list %}
       <tr>
-        <td>{{ log.acl_id }}</td>
+        <td><a href="{{ request.path }}{{ log.acl_id }}">{{ log.acl_id }}</a></td>
         {% endfor %}
       </tr>
     </tbody>

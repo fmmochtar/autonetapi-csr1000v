@@ -10,6 +10,7 @@ router = routers.DefaultRouter()
 router.register(r'users', views.UserViewSet)
 router.register(r'groups', views.GroupViewSet)
 router.register(r'device', views.DeviceViewSet)
+router.register(r'attacklog', views.AttackLogViewSet)
 
 urlpatterns = [
     path('', views.home, name='home'),
@@ -17,12 +18,13 @@ urlpatterns = [
     path('add_ip/', views.add_ip, name='add_ip'),
     path('interfaces/', views.show_interfaces, name='interfaces'),
     path('show/acl/', views.show_acl, name='show_acl'),
+    path('show/acl_rule/', views.show_acl_rule, name='show_acl_rule'),
     path('show/interface/', views.show_interfaces, name='show_interface'),
     path('result/', views.show_config, name='result'),
     path('log/', views.log, name='log'),
-    # path('static_route/', views.static_route, name='static'),
-    # path('ospf/', views.ospf, name='ospf'),
-    # path('bgp/', views.bgp, name='bgp'),
+    path('show_acl/', views.delete_acl_rule_0, name='delete_acl_rule_0'),
+    path('show_acl/<str:router_id>/', views.delete_acl_rule_1, name='delete_acl_rule_1'),
+    path('show_acl/<str:router_id>/<str:acl_id>/', views.delete_acl_rule_2, name='delete_acl_rule_2'),
     path('syslog/', views.syslog, name='syslog'),
     path('custom/', views.custom, name='custom'),
     path('api/', include(router.urls)),

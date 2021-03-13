@@ -2,8 +2,9 @@ from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User, Group
 from django.core.files.storage import FileSystemStorage
+from django.http import JsonResponse
 #from .forms import Scripts
-from .models import Device, Log
+from .models import Device, Log, AccessControlID, AttackLog
 import requests
 import urllib3
 import json
@@ -11,13 +12,12 @@ from datetime import datetime
 from .decorators import superadmin_only
 from rest_framework import viewsets
 from rest_framework import permissions
-from .serializers import UserSerializer, GroupSerializer, DeviceSerializer
+from .serializers import UserSerializer, GroupSerializer, DeviceSerializer, AttackLogSerializer
 from .pycsrmgmt import api
 # import csrestapi.auth
 # import csrestapi.api
 
-# router = csrestapi
-
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 FILE_TYPE = ['txt', 'conf']
 
@@ -52,6 +52,22 @@ class GroupViewSet(viewsets.ModelViewSet):
 class DeviceViewSet(viewsets.ModelViewSet):
     queryset = Device.objects.all()
     serializer_class = DeviceSerializer
+    #permission_classes = [permissions.IsAuthenticated]
+
+    #def list(self, request):
+    #    pass
+
+#@api_view(['GET', 'POST'])
+class AttackLogViewSet(viewsets.ModelViewSet):
+    queryset = AttackLog.objects.all()
+    serializer_class =  AttackLogSerializer
+
+    #def list(self, request):
+    #    pass
+
+    #def create(self, request):
+    #    pass
+
 # 
 
 # Start of the app views.
@@ -80,9 +96,10 @@ def devices(request):
 
 @login_required
 def show_interfaces(request):
-    selected_devices = request.POST.getlist('device')
-    for x in selected_devices:
-        dev = get_object_or_404(Device, pk=x)
+    # selected_devices = request.POST.getlist('device')
+    # dev = get_object_or_404(Device, pk=x)
+    #for x in selected_devices:
+    #    dev = get_object_or_404(Device, pk=x)
     if request.method == "POST":
         head = 'List of available interfaces'
         #cisco_command = request.POST['cisco_command']
@@ -95,22 +112,23 @@ def show_interfaces(request):
             def get_int_data(token):
                 get_interfaces = api.interface(dev.ip_address, token).get_all()
                 #interfaces = json.loads(get_interfaces['items'][x]['if-name'])
-                json_data = json.loads(get_interfaces)
+                json_data = json.loads(get_interfaces.replace("-", "_"))
                 #print(json.dumps(json_data, indent=4, separators=(',', ': ')))
-                if get_interfaces.status_code >= 400:
-                    return ('gabisa', json_data['detail'],)
+                if json_data['items']:
+                    return ('bisa', json_data['items'])
                 else:
-                    return ('bisa', json_data['results'])
+                    return ('gabisa', json_data['detail'])
 
             # Disable unverified HTTPS request warnings.
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
             # Get token.
             token = get_token()
+            get_data = get_int_data(token)
 
             # Put the CLI Command
-            get_int_data(token)
-            if get_int_data(token)[0] == "bisa":
+            #get_int_data(token)
+            if get_data[0] == "bisa":
                 log = Log(target=dev.ip_address, action="Get interfaces list", status="Successful", time= datetime.now(), user=request.user.username, messages="No Error")
                 log.save()
             else:
@@ -121,9 +139,9 @@ def show_interfaces(request):
             log.save()
         context = {
             'head' : head,
-            'status' : get_int_data(token)[1],
+            'int_data' : get_data[1],
         }
-        return render(request, 'netauto/result.html', context)
+        return render(request, 'netauto/device_show_interface.html', context)
     else:
         head = 'List of available interfaces'
         all_devices = Device.objects.all()
@@ -142,7 +160,6 @@ def show_acl(request):
         token = api.device(dev.ip_address, dev.username, dev.password).token()
     if request.method == "POST":
         head = 'List of registered ACL'
-        #cisco_command = request.POST['cisco_command']
         selected_device_id = request.POST['router']
         dev = get_object_or_404(Device, pk=selected_device_id)
         try:
@@ -152,17 +169,15 @@ def show_acl(request):
             def get_acl_data(token):
                 get_acl = api.acl(dev.ip_address, token).get_all()
                 json_data =json.loads(get_acl.replace("\"acl-id\":", "\"acl_id\":"))
-                #json_data = json.loads(get_acl)
                 acl_id_list = []
                 acl_rule_list = []
-                #print(json.dumps(json_data, indent=4, separators=(',', ': ')))
                 if json_data['items']:
                     for x in range(len(json_data['items'])):
                         acl_id_list.append(json_data['items'][x])
                         acl_rule_list.append(json_data['items'][x]['rules'])
                     return ('bisa', acl_id_list, acl_rule_list)
-                elif json_data['detail']:
-                    return ('gabisa', json_data['detail'])
+                # elif json_data['detail']:
+                #     return ('gabisa', json_data['detail'])
                 else:
                     return ('gabisa', 'null')
 
@@ -170,7 +185,8 @@ def show_acl(request):
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
             # Get token.
-            token = get_token()
+            #token = get_token()
+            token = api.device(dev.ip_address, dev.username, dev.password).token()
 
             # Put the CLI Command
             get_acl_data(token)
@@ -178,7 +194,7 @@ def show_acl(request):
                 log = Log(target=dev.ip_address, action="Get ACL list", status="Successful", time= datetime.now(), user=request.user.username, messages="No Error")
                 log.save()
             else:
-                log = Log(target=dev.ip_address, action="Get ACL list", status="Error", time= datetime.now(), user=request.user.username, messages="Failed to get data")
+                log = Log(target=dev.ip_address, action="Get ACL list", status="Error", time= datetime.now(), user=request.user.username, messages="Failed to get data, or no ACL exists yet.")
                 log.save()
         except Exception as e:
             log = Log(target=dev.ip_address, action="Get ACL list", status="Error", time= datetime.now(), user=request.user.username, messages="Failed establishing connection to device or requirements not match")
@@ -186,7 +202,6 @@ def show_acl(request):
         get_the_data = get_acl_data(token)
         context = {
             'head' : head,
-            #'acl_id' : get_the_data[1]['acl-id'],
             'acl_list' : get_the_data[1],
         }
         print(get_acl_data(token)[1])
@@ -200,6 +215,306 @@ def show_acl(request):
             'superadmin' : check_superadmin(request),
         }
         return render(request, 'netauto/device_select_acl.html', context)
+
+@login_required
+def show_acl_rule(request, acl_id):
+    if request.method == "POST":
+        head = 'List of registered ACL rule'
+        #selected_device_id = request.POST['router']
+        selected_acl_id = request.POST['acl_id']
+        acl_select = get_object_or_404(AccessControlID, pk=selected_acl_id)
+        print(acl_select.objects.select_related)
+        #dev = get_object_or_404(Device, pk=selected_device_id)
+        try:
+            def get_token():
+                token = api.device(acl_select.ip_address, acl_select.username, acl_select.password).token()
+                return token
+            def get_acl_data(token):
+                get_acl = api.acl(acl_select.ip_address, token).get_all()
+                json_data =json.loads(get_acl.replace("\"acl-id\":", "\"acl_id\":"))
+                acl_id_list = []
+                acl_rule_list = []
+                if json_data['items']:
+                    for x in range(len(json_data['items'])):
+                        acl_id_list.append(json_data['items'][x])
+                        acl_rule_list.append(json_data['items'][x]['rules'])
+                    return ('bisa', acl_id_list, acl_rule_list)
+                # elif json_data['detail']:
+                #     return ('gabisa', json_data['detail'])
+                else:
+                    return ('gabisa', 'null')
+
+            # Disable unverified HTTPS request warnings.
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+            # Get token.
+            #token = get_token()
+            token = api.device(acl_select.ip_address, acl_select.username, acl_select.password).token()
+
+            # Put the CLI Command
+            get_acl_data(token)
+            #if get_acl_data(token)[0] == "bisa":
+            #    log = Log(target=dev.ip_address, action="Get ACL list", status="Successful", time= datetime.now(), user=request.user.username, messages="No Error")
+            #    log.save()
+            #else:
+            #    log = Log(target=dev.ip_address, action="Get ACL list", status="Error", time= datetime.now(), user=request.user.username, messages="Failed to get data, or no ACL exists yet.")
+            #    log.save()
+        except Exception as e:
+            #log = Log(target=dev.ip_address, action="Get ACL list", status="Error", time= datetime.now(), user=request.user.username, messages="Failed establishing connection to device or requirements not match")
+            #log.save()
+            pass
+        token = get_token()
+        get_the_data = get_acl_data(token)
+        context = {
+            'head' : head,
+            'acl_list' : get_the_data[1],
+        }
+        print(get_acl_data(token)[1])
+        return render(request, 'netauto/acl_table.html', context)
+        
+    if request.method == "GET":
+        head = 'Show ACL rules'
+        all_acl = AccessControlID.objects.all()
+        context = {
+            'all_acl' : all_acl,
+            'head' : head,
+            'superadmin' : check_superadmin(request),
+        }
+        return render(request, 'netauto/device_select_acl_rule.html', context)
+
+# Device selection page
+@login_required
+def delete_acl_rule_0(request):
+    if request.method == "POST":
+        head = 'List of registered ACL'
+        selected_device_id = request.POST['router']
+        dev = get_object_or_404(Device, pk=selected_device_id)
+
+        return redirect('/show_acl/'+selected_device_id+'/')
+        #return render(request, 'netauto/acl_table.html', context)
+    else:
+        head = 'Show ACL lists'
+        all_devices = Device.objects.all()
+        context = {
+            'all_devices' : all_devices,
+            'head' : head,
+            'superadmin' : check_superadmin(request),
+        }
+        return render(request, 'netauto/device_select_acl.html', context)
+    #return redirect()
+
+# ACL ID selection page
+@login_required
+def delete_acl_rule_1(request, router_id):
+    selected_device_id = router_id
+    dev = get_object_or_404(Device, pk=selected_device_id)
+    #selected_acl_id = acl_id
+    #x = (dev)
+    #return HttpResponse(x)
+    if request.method == "POST":
+        head = 'List of registered ACL'
+        selected_device_id = request.POST['router']
+        dev = get_object_or_404(Device, pk=selected_device_id)
+        try:
+            def get_token():
+                token = api.device(dev.ip_address, dev.username, dev.password).token()
+                return token
+            def get_acl_data(token):
+                get_acl = api.acl(dev.ip_address, token).get_all()
+                json_data =json.loads(get_acl.replace("-id\":", "\"_id\":"))
+                acl_id_list = []
+                #acl_rule_list = []
+                if json_data['items']:
+                    for x in range(len(json_data['items'])):
+                        acl_id_list.append(json_data['items'][x])
+                        #acl_rule_list.append(json_data['items'][x]['rules'])
+                    return ('bisa', acl_id_list)
+                # elif json_data['detail']:
+                #     return ('gabisa', json_data['detail'])
+                else:
+                    return ('gabisa', 'null')
+
+            # Disable unverified HTTPS request warnings.
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+            # Get token.
+            #token = get_token()
+            token = api.device(dev.ip_address, dev.username, dev.password).token()
+
+            # Put the CLI Command
+            get_acl_data(token)
+            if get_acl_data(token)[0] == "bisa":
+                pass
+            else:
+                pass
+        except Exception as e:
+            pass
+        get_the_data = get_acl_data(token)
+        context = {
+            'head' : head,
+            'acl_list' : get_the_data[1],
+        }
+        #print(get_acl_data(token)[1])
+        return redirect('/show_acl/'+selected_device_id+'/')
+        #return render(request, 'netauto/acl_table.html', context)
+    if request.method == "GET":
+        head = 'List of registered ACL rule'
+        #selected_device_id = request.POST['router']
+        #selected_acl_id = request.POST['acl_id']
+        #acl_select = get_object_or_404(AccessControlID, pk=selected_acl_id)
+        #print(acl_select.objects.select_related)
+        #dev = get_object_or_404(Device, pk=selected_device_id)
+        try:
+            def get_token():
+                token = api.device(dev.ip_address, dev.username, dev.password).token()
+                return token
+            def get_acl_data(token):
+                get_acl = api.acl(dev.ip_address, token).get_all()
+                json_data = json.loads(get_acl.replace("\"acl-id\":", "\"acl_id\":"))
+                acl_id_list = []
+                acl_rule_list = []
+                if json_data['items']:
+                    for x in range(len(json_data['items'])):
+                        acl_id_list.append(json_data['items'][x])
+                        acl_rule_list.append(json_data['items'][x]['rules'])
+                    return ('bisa', acl_id_list, acl_rule_list)
+                # elif json_data['detail']:
+                #     return ('gabisa', json_data['detail'])
+                else:
+                    return ('gabisa', 'null')
+
+            # Disable unverified HTTPS request warnings.
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+            # Get token.
+            #token = get_token()
+            token = api.device(dev.ip_address, dev.username, dev.password).token()
+
+            # Put the CLI Command
+            get_acl_data(token)
+
+        except Exception as e:
+            pass
+        token = get_token()
+        get_the_data = get_acl_data(token)
+        context = {
+            'head' : head,
+            'acl_list' : get_the_data[1],
+        }
+        print(get_acl_data(token)[1])
+        return render(request, 'netauto/acl_table.html', context)
+    else:
+        return redirect('/show_acl/')
+
+@login_required
+def delete_acl_rule_2(request, router_id, acl_id):
+
+    if request.method == "POST":
+        if 'delete' in request.POST.getlist('action'):
+            selected_device_id = router_id
+            selected_acl_id = acl_id
+            dev = get_object_or_404(Device, pk=selected_device_id)
+            selected_rule = request.POST.getlist('acl_rule')
+            print (request.POST)
+
+            for x in selected_rule:    
+                try:
+                    dev = get_object_or_404(Device, pk=selected_device_id)
+
+                    # get token
+                    get_token = api.device(dev.ip_address, dev.username, dev.password).token()
+                    # delete acl rule
+                    post_del_rules = api.acl(dev.ip_address, get_token).remove_existing(selected_acl_id, x)
+                    get_post_data = post_del_rules['items']
+
+                    # Put new interface.
+                    if get_post_data:
+                        log = Log(target=dev.ip_address, action="Delete ACL rule", status="Successful", time= datetime.now(), user=request.user.username, messages='No Error')
+                        log.save()
+                    else:
+                        log = Log(target=dev.ip_address, action="Delete ACL rule", status="Error", time= datetime.now(), user=request.user.username, messages='An error occured')
+                        log.save()
+                except Exception as e:
+                    log = Log(target=dev.ip_address, action="Delete ACL rule", status="Error", time= datetime.now(), user=request.user.username, messages="Failed establishing connection to device or requirements not match")
+                    log.save()
+            return redirect('home')
+        else:
+            return redirect(request.META['HTTP_REFERER'])
+
+        
+
+    elif request.method == "GET":
+        head = 'List of registered ACL rule'
+        selected_device_id = router_id
+        dev = get_object_or_404(Device, pk=selected_device_id)
+        selected_acl_id = acl_id
+
+        try:
+            def get_token():
+                token = api.device(dev.ip_address, dev.username, dev.password).token()
+                return token
+            def get_acl_data(token):
+                get_acl = api.acl(dev.ip_address, token).get(selected_acl_id)
+                json_data = json.loads(get_acl)
+                #acl_id_list = []
+                acl_rule_list = []
+                #acl_rule_list = json_data['rules']
+                if json_data['rules']:
+                    for x in range(len(json_data['rules'])):
+                        acl_rule_list.append(json_data['rules'][x])
+                        #acl_id_list.append(json_data['rules'][x])
+                    #    acl_rule_list.append(json_data[x]['rules'])
+                    return ('bisa', acl_rule_list)
+                # elif json_data['detail']:
+                #     return ('gabisa', json_data['detail'])
+                else:
+                    return ('gabisa', 'null')
+            def get_acl_interfaces(token):
+                acl_int = api.acl(dev.ip_address, token).get_interfaces(selected_acl_id)
+                json_data = json.loads(acl_int.replace("-id\":", "_id\":"))
+                list_int = []
+                if json_data['items']:
+                    for x in range(len(json_data['items'])):
+                        list_int.append(json_data['items'][x])
+                    return ('bisa', list_int)
+                # elif json_data['detail']:
+                #     return ('gabisa', json_data['detail'])
+                else:
+                    return ('gabisa', 'null')
+
+            # Disable unverified HTTPS request warnings.
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+            # Get token.
+            #token = get_token()
+            token = api.device(dev.ip_address, dev.username, dev.password).token()
+
+            # Put the CLI Command
+            get_payload = get_acl_data(token)
+            if get_payload[0] == "bisa":
+                pass
+            else:
+                pass
+        except Exception as e:
+            return redirect('delete_acl_rule_0')
+        token = get_token()
+        get_the_data = get_payload
+        acl_int_payload = get_acl_interfaces(token)
+        context = {
+            'head' : head,
+            'acl_list' : get_the_data[1],
+            'int_list' : acl_int_payload[1]
+        }
+        print(get_acl_data(token)[1])
+        #return render(request, 'netauto/acl_rules_table.html', context)
+        return render(request, 'netauto/acl_rules_table_check.html', context)
+    else:
+        return redirect('delete_acl_rule_0')
+
+    #selected_acl_rule = acl_rule
+    #x = (dev, acl_id)
+    #return HttpResponse(x)
+    #return render(request, 'netauto/device_select_acl_rule.html', context)
 
 @login_required
 @superadmin_only
@@ -265,71 +580,6 @@ def add_ip(request):
             'superadmin' : check_superadmin(request),
         }
         return render(request, 'netauto/add_ip.html', context)
-
-@login_required
-@superadmin_only
-def static_route(request):
-    if request.method == "POST":
-        selected_device_id = request.POST.getlist('device')
-        for x in selected_device_id:
-            try:
-                dev = get_object_or_404(Device, pk=x)
-                dest_network = request.POST['dest'+x]+ '/' + request.POST['prefix'+x]
-                next_hop =  request.POST['next_hop'+x] 
-                outinterface = request.POST['outinterface'+x]
-                admin_distance = request.POST['admin_distance'+x]
-                def get_token():
-                    url = 'https://%s:55443/api/v1/auth/token-services' % dev.ip_address
-                    auth = (dev.username, dev.password) 
-                    headers = {'Content-Type':'application/json'}
-                    response = requests.post(url, auth=auth, headers=headers, verify=False)
-                    json_data = json.loads(response.text)
-                    token = json_data['token-id']
-                    return token
-                def post_static_route(token, outinterface):
-                    url = 'https://%s:55443/api/v1/routing-svc/static-routes' % dev.ip_address
-                    headers = {'Content-Type':'application/json','Accept':'application/json','X-auth-token': token}
-                    payload = {
-                        "destination-network": dest_network,
-                        "next-hop-router": next_hop,
-                        "outgoing-interface": outinterface,
-                        "admin-distance": int(admin_distance)
-                    }
-                    response = requests.post(url, headers=headers, json=payload, verify=False)
-                    if response.status_code >= 400:
-                        message = json.loads(response.text)['error-message']
-                    else:
-                        message = 'Success'
-                    return message
-
-                # Disable unverified HTTPS request warnings.
-                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-                # Get token.
-                token = get_token()
-
-                # Post static route.
-                hasil = post_static_route(token, outinterface)
-
-                if hasil == "Success":
-                    log = Log(target=dev.ip_address, action="Add Static Route", status="Successful", time= datetime.now(), user=request.user.username, messages='No Error')
-                    log.save()
-                else:
-                    log = Log(target=dev.ip_address, action="Add Static Route", status="Error", time= datetime.now(), user=request.user.username, messages=post_static_route(token,outinterface))
-                    log.save()
-            except Exception as e:
-                log = Log(target=dev.ip_address, action="Add Static Route", status="Error", time= datetime.now(), user=request.user.username, messages="Failed establishing connection to device or requirements not match")
-                log.save()
-        return redirect('home')
-
-
-    else:
-        all_devices = Device.objects.all()
-        context = {
-            'all_devices' : all_devices,
-            'superadmin' : check_superadmin(request),
-        }
-        return render(request, 'netauto/static_route.html', context)
 
 @login_required
 def show_config(request):
