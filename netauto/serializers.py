@@ -20,7 +20,7 @@ class DeviceSerializer(serializers.HyperlinkedModelSerializer):
 class AttackLogSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = AttackLog
-        fields = ['source_ip', 'dst_port']
+        fields = ['source_ip', 'dst_port', 'dst_port', 'conn_protocol']
 
 # class AttackLogSerializer(serializers.HyperlinkedModelSerializer):
 #     class Meta:

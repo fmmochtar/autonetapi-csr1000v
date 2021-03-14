@@ -28,6 +28,7 @@ class analyze(object):
 
     # Check the source IP. If it exists either in the database or in a default specified ACL rule, returns True.
     # attacker_exists_db
+    # def attacker_exists(self):
     def assert_rule0(self):
         if (self.source_ip in self.list_of_attackers and self.destination_ip in self.acl_list) or (self.source_ip in self.acl_list):
             return True
@@ -36,6 +37,7 @@ class analyze(object):
 
     # Check the entropy value. If the value is higher than the threshold, returns True, as if it is DDoS/DoS attack.
     # entropy_is_high
+    # def entropy_is_high(self):
     def assert_rule1(self):
         if self.entropy_value < self.entropy_threshold:
             return True
@@ -44,8 +46,12 @@ class analyze(object):
 
     # Make sure that the attacker never tried to attack more than n times threshold. If it reaches, or exceeds, returns True.
     # attacker_limit_reached
+    # def attacker_limit_reached(self):
     def assert_rule2(self):
         if self.source_ip in self.list_of_attackers and sum([x in self.source_ip  for x in self.list_of_attackers]) >= self.attack_threshold:
             return True
         else:
             return False
+
+    #def assert_rule3(self):
+    #    

@@ -95,9 +95,10 @@
               <h6 class="collapse-header">Configuration:</h6>
               <a class="collapse-item" href=" {% url 'add_ip' %} ">IP Address</a>
               <!--- <a class="collapse-item" href="  url 'acl_config' ">ACL Configuration</a>  --->
+              <a class="collapse-item" href=" {% url 'manage_acl_0' %} ">Access Control List</a>
               <a class="collapse-item" href=" {% url 'custom' %} ">Custom Configuration</a>
               <div class="collapse-divider">
-                <h6 class="collapse-header">Routing:</h6>
+              <!--  <h6 class="collapse-header">Routing:</h6> -->
               <!---   <a class="collapse-item" href=" { url 'static' } ">Static Route</a> -->
               </div>
             </div>
@@ -134,7 +135,6 @@
           >
             <div class="bg-white py-2 collapse-inner rounded">
               <a class="collapse-item" href=" {% url 'show_interface' %} ">Interfaces list</a>
-              <a class="collapse-item" href=" {% url 'show_acl' %} ">ACL lists</a>
               <a class="collapse-item" href=" {% url 'log' %} ">App Log</a>
               <a class="collapse-item" href=" {% url 'syslog' %} ">Export Syslog</a>
             </div>
