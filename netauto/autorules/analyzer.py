@@ -10,7 +10,7 @@ import json
 # This is the main class
 
 class analyze(object):
-    def __init__(self, entropy_value, entropy_threshold, source_ip, destination_ip, destination_port, attack_total, attack_threshold, list_of_attackers, acl_list, source_flag=''):
+    def __init__(self, entropy_value, entropy_threshold, source_ip, destination_ip, destination_port, attack_total, attack_threshold, list_of_attackers, list_of_victims, acl_list, source_flag=''):
         self.entropy_value = entropy_value
         self.entropy_threshold = entropy_threshold
         self.source_ip = source_ip
@@ -19,12 +19,13 @@ class analyze(object):
         self.attack_total = attack_total
         self.attack_threshold = attack_threshold
         self.list_of_attackers = list_of_attackers
+        self.list_of_victims = list_of_victims
         self.acl_list = acl_list
         #self.source_flag = source_flag
 
-    #-------------------------------------
-    # - Rules (antecedents?) starts here
-    #-------------------------------------
+    #---------------------------------------------
+    # - Rules (antecedents/premises?) starts here
+    #---------------------------------------------
 
     # Check the source IP. If it exists either in the database or in a default specified ACL rule, returns True.
     # attacker_exists_db
@@ -48,10 +49,13 @@ class analyze(object):
     # attacker_limit_reached
     # def attacker_limit_reached(self):
     def assert_rule2(self):
-        if self.source_ip in self.list_of_attackers and sum([x in self.source_ip  for x in self.list_of_attackers]) >= self.attack_threshold:
+        if self.source_ip in self.list_of_attackers and sum([x in self.source_ip for x in self.list_of_attackers]) >= self.attack_threshold:
             return True
         else:
             return False
 
-    #def assert_rule3(self):
-    #    
+    def assert_rule3(self):
+        if sum([x in self.destination_ip for x in self.list_of_attackers]) >= 20:
+            return True
+        else:
+            return False

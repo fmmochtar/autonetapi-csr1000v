@@ -44,7 +44,6 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-
 class GroupViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows groups to be viewed or edited.
@@ -69,26 +68,27 @@ class AttackLogViewSet(viewsets.ModelViewSet):
     #def list(self, request):
     #    pass
 
+    # This is the alerting API
     #@action(detail=True, methods=['post'])
     def create(self, request):
+
+        serializer = AttackLogSerializer(data=request.data)
+        serializer.is_valid()
+        
+        attacker_ip = serializer.data['source_ip']
+        victim_ip = serializer.data['dst_ip']
+        victim_port = serializer.data['dst_port']
+
         try:
             auto_devices = Device.objects.all().filter(auto_mitigate=True)
-            serializer = AttackLogSerializer(data=request.data)
-            serializer.is_valid()
-            attacker_ip = serializer.data['source_ip']
             print(attacker_ip)
             for i in auto_devices:
-                #def get_token():
-                #    token = api.device(i.ip_address, i.username, i.password).token()
-                #    return token
                 token = api.device(i.ip_address, i.username, i.password).token()
                 print('token is ' + token)
                 #token = get_token()
                 get_acl = api.acl(i.ip_address, token).get(i.default_acl_id)
                 json_data = json.loads(get_acl.replace("\"acl-id\":", "\"acl_id\":"))
                 acl_rule_list = []
-                #acl_rule_seq = []
-                #print(json_data['items'])
                 if json_data['rules']:
                     for x in range(len(json_data['rules'])):
                         acl_rule_list.append(json_data['rules'][x]['sequence'])
