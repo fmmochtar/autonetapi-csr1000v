@@ -44,7 +44,7 @@ class analyze(object):
     def assert_rule2(self):
         #if self.source_ip in self.list_of_attackers and sum([x in self.source_ip for x in self.list_of_attackers]) >= self.attack_threshold:
         #if self.source_ip in self.list_of_attackers and len(self.list_of_attackers) >= self.attack_threshold:
-        if self.attack_threshold >= self.attack_threshold:
+        if self.attack_total >= self.attack_threshold:
             return True
         else:
             return False
