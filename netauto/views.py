@@ -16,6 +16,7 @@ from rest_framework.decorators import action
 #from rest_framework import permissions
 from .serializers import UserSerializer, GroupSerializer, DeviceSerializer, AttackLogSerializer
 from .pycsrmgmt import api
+from .rulesets import *
 #from .autorules import antecedents
 #import .rules as rules
 # import csrestapi.auth
@@ -73,41 +74,83 @@ class AttackLogViewSet(viewsets.ModelViewSet):
     def create(self, request):
 
         serializer = AttackLogSerializer(data=request.data)
-        serializer.is_valid()
-        
-        attacker_ip = serializer.data['source_ip']
-        victim_ip = serializer.data['dst_ip']
-        victim_port = serializer.data['dst_port']
+        if serializer.is_valid() == True:
 
-        try:
-            auto_devices = Device.objects.all().filter(auto_mitigate=True)
-            print(attacker_ip)
-            for i in auto_devices:
-                token = api.device(i.ip_address, i.username, i.password).token()
-                print('token is ' + token)
-                #token = get_token()
-                get_acl = api.acl(i.ip_address, token).get(i.default_acl_id)
-                json_data = json.loads(get_acl.replace("\"acl-id\":", "\"acl_id\":"))
-                acl_rule_list = []
-                if json_data['rules']:
-                    for x in range(len(json_data['rules'])):
-                        acl_rule_list.append(json_data['rules'][x]['sequence'])
-                print(acl_rule_list)
-                print(i.default_acl_id)
-                #block_with_acl = api.acl(i.ip_address, token).add_existing(i.default_acl_id, '36', 'all', attacker_ip, 'any', 'deny')
-                #block_with_acl = api.acl(i.ip_address, token).add_existing(i.default_acl_id, '22', 'ip', attacker_ip+'/32', 'any', 'deny')
-                #print('[csr-api] if the attack successfully mitigated, then any output from api should appear here')
-                #print(block_with_acl)
-                for ex in (list(range(30,1000))):
-                    if ex in acl_rule_list:
-                        print('occupied')
-                    else:
-                        block_with_acl = api.acl(i.ip_address, token).add_existing(i.default_acl_id, ex, 'all', attacker_ip, 'any', 'deny')
-                        #print(block_with_acl)
-                        break
-            return Response({'status': 'post'}, status=status.HTTP_200_OK)
-        except Exception as e:
-                pass
+            attacker_ip = serializer.data['source_ip']
+            victim_ip = serializer.data['dst_ip']
+            victim_port = serializer.data['dst_port']
+
+            try:
+                auto_devices = Device.objects.all().filter(auto_mitigate=True)
+                attacker_list = AttackLog.objects.all().filter(source_ip=attacker_ip)
+                victim_list = AttackLog.objects.all().filter(dst_ip=victim_ip)
+
+                #print(len(attacker_list))
+                attacker_attempts = len(attacker_list)
+
+                #attacker_list_send = list(attacker_list)
+
+                #for c in attacker_list:
+                #    attacker_list_send.append(attacker_list.source_ip)
+
+                print(attacker_ip)
+                for i in auto_devices:
+                    token = api.device(i.ip_address, i.username, i.password).token()
+                    print('token is ' + token)
+                    #token = get_token()
+                    get_acl = api.acl(i.ip_address, token).get(i.default_acl_id)
+                    json_data = json.loads(get_acl.replace("\"acl-id\":", "\"acl_id\":"))
+                    acl_rule_id_list = []
+                    acl_rule_src_list = []
+                    if json_data['rules']:
+                        for x in range(len(json_data['rules'])):
+                            acl_rule_id_list.append(json_data['rules'][x]['sequence'])
+                            acl_rule_src_list.append(json_data['rules'][x]['source'])
+                    print(acl_rule_id_list)
+                    print(acl_rule_src_list)
+                    print(i.default_acl_id)
+                    #print(attacker_list_send)
+                    
+                    #print('[csr-api] if the attack successfully mitigated, then any output from api should appear here')
+                    #print(block_with_acl)
+
+                    # Inference engine starts here
+                    #rule_action(entropy_value,entropy_threshold,source_ip, destination_ip, destination_port, attack_total, attack_threshold, list_of_attackers, victim_list, acl_list)
+                    inference = rule_action(1.0, 1.2, attacker_ip, victim_ip, victim_port, attacker_attempts, 3, [], victim_list, acl_rule_src_list)
+                    block_action = inference.run()
+                    print(block_action)
+
+                    for ex in (list(range(30,1000))):
+                        if ex in acl_rule_id_list:
+                            print('occupied')
+                        else:
+                            if block_action == 'block-all':
+                                block_with_acl = api.acl(i.ip_address, token).add_existing(i.default_acl_id, ex, 'all', attacker_ip, 'any', 'deny')
+                                print (block_with_acl)
+                                #log = AttackLog(time=datetime.now(), source_ip=attacker_ip, dst_ip=victim_ip, dst_port=victim_port, status='block-all')
+                                #log.save()
+                                break #return Response({'status': 'post'}, status=status.HTTP_200_OK)
+                            elif block_action == 'block-single':
+                                block_with_acl = api.acl(i.ip_address, token).add_existing(i.default_acl_id, ex, 'all', attacker_ip, victim_ip, 'deny')
+                                print (block_with_acl)
+                                #log = AttackLog(time=datetime.now(), source_ip=attacker_ip, dst_ip=victim_ip, dst_port=victim_port, status='block-single')
+                                #log.save()
+                                break# return Response({'status': 'post'}, status=status.HTTP_200_OK)
+                            elif block_action == 'ignore':
+                                return Response({'status': 'post'}, status=status.HTTP_200_OK)
+                                break # pass
+                            else:
+                                break #pass
+                            break
+                if block_action != 'ignore':
+                    log = AttackLog(time=datetime.now(), source_ip=attacker_ip, dst_ip=victim_ip, dst_port=victim_port, status=block_action)
+                    log.save()
+                else:
+                    pass
+                return Response({'status': 'post'}, status=status.HTTP_200_OK)
+            except Exception as e:
+                print('Error: ' + str(e))
+                return Response({'status': 'error'}, status=status.HTTP_200_OK)
 
 # Start of the app views.
 
@@ -250,64 +293,6 @@ def show_acl(request):
         }
         return render(request, 'netauto/device_select_acl.html', context)
 
-# @login_required
-# def show_acl_rule(request, acl_id):
-#     if request.method == "POST":
-#         head = 'List of registered ACL rule'
-#         #selected_device_id = request.POST['router']
-#         selected_acl_id = request.POST['acl_id']
-#         acl_select = get_object_or_404(AccessControlID, pk=selected_acl_id)
-#         print(acl_select.objects.select_related)
-#         #dev = get_object_or_404(Device, pk=selected_device_id)
-#         try:
-#             def get_token():
-#                 token = api.device(acl_select.ip_address, acl_select.username, acl_select.password).token()
-#                 return token
-#             def get_acl_data(token):
-#                 get_acl = api.acl(acl_select.ip_address, token).get_all()
-#                 json_data =json.loads(get_acl.replace("\"acl-id\":", "\"acl_id\":"))
-#                 acl_id_list = []
-#                 acl_rule_list = []
-#                 if json_data['items']:
-#                     for x in range(len(json_data['items'])):
-#                         acl_id_list.append(json_data['items'][x])
-#                         acl_rule_list.append(json_data['items'][x]['rules'])
-#                     return ('bisa', acl_id_list, acl_rule_list)
-#                 # elif json_data['detail']:
-#                 #     return ('gabisa', json_data['detail'])
-#                 else:
-#                     return ('gabisa', 'null')
-# 
-#             # Disable unverified HTTPS request warnings.
-#             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-# 
-#             # Get token.
-#             #token = get_token()
-#             token = api.device(acl_select.ip_address, acl_select.username, acl_select.password).token()
-# 
-#             # Put the CLI Command
-#             get_acl_data(token)
-# 
-#         except Exception as e:
-#             pass
-#         token = get_token()
-#         get_the_data = get_acl_data(token)
-#         context = {
-#             'head' : head,
-#             'acl_list' : get_the_data[1],
-#         }
-#         print(get_acl_data(token)[1])
-#         return render(request, 'netauto/acl_table.html', context)
-#         
-#     if request.method == "GET":
-#         head = 'Show ACL rules'
-#         all_acl = AccessControlID.objects.all()
-#         context = {
-#             'all_acl' : all_acl,
-#             'head' : head,
-#             'superadmin' : check_superadmin(request),
-#         }
-#         return render(request, 'netauto/device_select_acl_rule.html', context)
 
 # Device selection page
 @login_required

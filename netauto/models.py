@@ -36,11 +36,11 @@ class AttackLog(models.Model):
     time = models.DateTimeField(null=True, verbose_name='Time')
     source_ip = models.CharField(max_length=200, verbose_name='Source IP address')
     dst_ip = models.CharField(max_length=200, verbose_name='Destination IP address', default='any')
-    dst_port = models.CharField(max_length=200, verbose_name='Destination port', default=None)
-    conn_protocol = models.CharField(max_length=200, verbose_name='Protocol')
-    conn_flag = models.CharField(max_length=200, verbose_name='Connection flag')
-    acl_id = models.CharField(max_length=200, verbose_name='ACL ID')
-    acl_sequence = models.IntegerField(verbose_name='ACL Sequence')
+    dst_port = models.CharField(max_length=200, verbose_name='Destination port', default=None,  blank=True)
+    conn_protocol = models.CharField(max_length=200, verbose_name='Protocol', blank=True)
+    conn_flag = models.CharField(max_length=200, verbose_name='Connection flag', blank=True)
+    # acl_id = models.CharField(max_length=200, verbose_name='ACL ID', blank=True)
+    # acl_sequence = models.IntegerField(verbose_name='ACL Sequence', blank=True)
     status = models.CharField(max_length=200)
 
     def __str__(self):

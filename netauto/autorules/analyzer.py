@@ -2,13 +2,6 @@ import requests
 import time
 import json
 
-#from .pycsrmgmt import *
-
-#list_of_attackers = []
-#acl_list = []
-
-# This is the main class
-
 class analyze(object):
     def __init__(self, entropy_value, entropy_threshold, source_ip, destination_ip, destination_port, attack_total, attack_threshold, list_of_attackers, list_of_victims, acl_list, source_flag=''):
         self.entropy_value = entropy_value
@@ -49,7 +42,9 @@ class analyze(object):
     # attacker_limit_reached
     # def attacker_limit_reached(self):
     def assert_rule2(self):
-        if self.source_ip in self.list_of_attackers and sum([x in self.source_ip for x in self.list_of_attackers]) >= self.attack_threshold:
+        #if self.source_ip in self.list_of_attackers and sum([x in self.source_ip for x in self.list_of_attackers]) >= self.attack_threshold:
+        #if self.source_ip in self.list_of_attackers and len(self.list_of_attackers) >= self.attack_threshold:
+        if self.attack_threshold >= self.attack_threshold:
             return True
         else:
             return False
