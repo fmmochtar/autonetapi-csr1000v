@@ -94,4 +94,25 @@ def get_netflow_resampled(start_time: str, end_time: str, client=client_from_env
             }
         }
     )
-    return response["aggregation"]["all_attributes"]["buckets"]
+    return response["aggregations"]["all_attributes"]["buckets"]
+
+
+def get_netflow_data_at_time(time: str, client=client_from_env, index=index_form_env) -> dict:
+    response = client.search(
+        index=index,
+        body={
+            "size": 1,
+            "query": {
+                "match": {
+                    "@timestamp": time
+                }
+            },
+            "_source": [
+                "netflow.source_ipv4_address",
+                "netflow.destination_ipv4_address",
+                "netflow.destination_transport_port",
+                "netflow.protocol_identifier"
+            ]
+        }
+    )
+    return response['hits']['hits'][0]['netflow']
