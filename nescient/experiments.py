@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from nescient.apiclient import report
-from nescient.elasticclient import get_netflow_resampled, get_netflow_data_at_time
+from nescient.elasticclient import get_netflow_resampled, get_netflow_data_at_nearest_time
 from nescient.utils import getprotobynumber
 
 normal_start_time = "2021-03-14T14:11:53"
@@ -67,6 +67,9 @@ for A in A_all:
     current_N_array = list()
     current_beta_array = list()
 
+    A_list = A.iloc[:, 1].to_list()
+    safe_A_list = [*A_list, *([0] * K * T)]
+
     current_moving_A = A.iloc[j: j+K, 1].to_list()
     current_moving_mean = np.mean(current_moving_A)
     current_moving_variance = np.std(current_moving_A)
@@ -79,35 +82,35 @@ for A in A_all:
     while j < len(A1_all):
         if j < 0 and j % K*T == 0:
             beta = 1.5
-            current_moving_A = A.iloc[j: j+K, 1].to_list()
+            current_moving_A = safe_A_list[j: j+K]
             current_moving_mean = np.mean(current_moving_A)
             current_moving_variance = np.std(current_moving_A)
             current_threshold = (current_moving_mean + current_moving_variance) * beta
 
             current_threshold_array.append([j, current_threshold])
             current_beta_array.append([j, beta])
-            if A.iloc[j:j+1, 1].to_list()[0] > current_threshold:
+            if safe_A_list[j:j+1][0] > current_threshold:
                 current_N_array.append([j, True])
             else:
                 current_N_array.append([j, False])
         else:
-            if A.iloc[j:j+1, 1].to_list()[0] > current_threshold:
+            if safe_A_list[j:j+1][0] > current_threshold:
                 current_N_array.append([j, True])
             else:
                 current_N_array.append([j, False])
             j = j + 1
             current_j = j
             previous_j = j - 1
-            previous_moving_mean = np.mean(A.iloc[previous_j: previous_j+K, 1].to_list())
-            current_moving_mean = np.mean(A.iloc[current_j: current_j+K, 1].to_list())
+            previous_moving_mean = np.mean(safe_A_list[previous_j: previous_j+K])
+            current_moving_mean = np.mean(safe_A_list[current_j: current_j+K])
             if current_moving_mean > 2 * previous_moving_mean:
                 beta = beta + 0.5
-                current_threshold = (current_moving_mean + np.std(A.iloc[current_j: current_j+K, 1].to_list())) / beta
+                current_threshold = (current_moving_mean + np.std(safe_A_list[current_j: current_j+K])) / beta
             else:
                 beta = beta - 0.5
                 if beta < 1.0:
                     beta = 1
-                current_threshold = (current_moving_mean + np.std(A.iloc[current_j: current_j+K, 1].to_list())) * beta
+                current_threshold = (current_moving_mean + np.std(safe_A_list[current_j: current_j+K])) * beta
             current_threshold_array.append([current_j, current_threshold])
             current_beta_array.append([j, beta])
 
@@ -117,16 +120,16 @@ for A in A_all:
 
 
 for idx in j_to_end:
-    if N_all[0][idx] is True and N_all[1][idx] is True and N_all[2][idx] is True and N_all[3][idx] is True:
-        timestamp = data_to_be_used[idx]['key_as_string'][:-1]
-        positive_traffic = get_netflow_data_at_time(timestamp)
+    if N_all[0][idx][1] is True and N_all[1][idx][1] is True and N_all[2][idx][1] is True and N_all[3][idx][1] is True:
+        timestamp = int(str(data_to_be_used[idx]['key'])[:-3])
+        positive_traffic = get_netflow_data_at_nearest_time(timestamp)
 
-        report(
+        print(
             positive_traffic['source_ipv4_address'],
             positive_traffic['destination_ipv4_address'],
             positive_traffic['destination_transport_port'],
             getprotobynumber(positive_traffic['protocol_identifier']),
-            data_to_be_used[idx]['key']
+            timestamp
         )
 
 

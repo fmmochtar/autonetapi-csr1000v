@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from elasticsearch import Elasticsearch
+from datetime import datetime
 
 load_dotenv(verbose=True)
 
@@ -97,14 +98,14 @@ def get_netflow_resampled(start_time: str, end_time: str, client=client_from_env
     return response["aggregations"]["all_attributes"]["buckets"]
 
 
-def get_netflow_data_at_time(time: str, client=client_from_env, index=index_form_env) -> dict:
+def get_netflow_data_at_nearest_time(time: int, is_after=True,  client=client_from_env, index=index_form_env) -> dict:
     response = client.search(
         index=index,
         body={
             "size": 1,
             "query": {
                 "match": {
-                    "@timestamp": time
+                    "@timestamp": datetime.utcfromtimestamp(time).strftime('%Y-%m-%dT%H:%M:%S.000Z')
                 }
             },
             "_source": [
@@ -115,4 +116,7 @@ def get_netflow_data_at_time(time: str, client=client_from_env, index=index_form
             ]
         }
     )
-    return response['hits']['hits'][0]['netflow']
+    if response['hits']['total']['value'] > 0:
+        return response['hits']['hits'][0]['_source']['netflow']
+    else:
+        return get_netflow_data_at_nearest_time(time + 1 if is_after is True else time - 1)

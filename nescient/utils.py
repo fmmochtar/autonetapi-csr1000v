@@ -1046,7 +1046,7 @@ def getprotospecs() -> list:
 def getprotobynumber(number: int) -> str:
     speclist = getprotospecs()
     for spec in speclist:
-        if spec['protoNumber'] == number:
+        if int(spec['protoNumber']) == number:
             return spec['protoName']
     return "Unassigned"
 
