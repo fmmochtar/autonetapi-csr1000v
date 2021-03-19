@@ -124,7 +124,7 @@ for idx in j_to_end:
         timestamp = int(str(data_to_be_used[idx]['key'])[:-3])
         positive_traffic = get_netflow_data_at_nearest_time(timestamp)
 
-        print(
+        report(
             positive_traffic['source_ipv4_address'],
             positive_traffic['destination_ipv4_address'],
             positive_traffic['destination_transport_port'],
